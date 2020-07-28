@@ -13,10 +13,9 @@ Azure Resource Quotas into a Log Analytics Workspace (Using PowerShell)
 Credit to Original Solution: https://blogs.msdn.microsoft.com/tomholl/2017/06/11/get-alerts-as-you-approach-your-azure-resource-quotas/
 #>
 
-
-$omsWorkspaceId = "log analytics workspace ID here"
-$omsSharedKey = "log analytics key here"
-$Subscriptions = "subscription ID 1", "subscription ID 2", "etc."
+$omsWorkspaceId = ls env:APPSETTING_omsWorkspaceId
+$omsSharedKey = ls env:APPSETTING_omsSharedKey
+$Subscriptions = "xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxx"
 $locations = "eastus2", "centralus"
 
 
@@ -33,6 +32,26 @@ catch {
 $LogType = "AzureQuota"
  
 $json = ''
+ 
+# Credit: s_lapointe  https://gallery.technet.microsoft.com/scriptcenter/Easily-obtain-AccessToken-3ba6e593
+function Get-AzCachedAccessToken()
+{
+    $ErrorActionPreference = 'Stop'
+  
+    if(-not (Get-Module Az.Accounts)) {
+        Import-Module Az.Accounts
+    }
+    $azProfile = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile
+    if(-not $azProfile.Accounts.Count) {
+        Write-Error "Ensure you have logged in before calling this function."    
+    }
+  
+    $currentAzureContext = Get-AzContext
+    $profileClient = New-Object Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient($azProfile)
+    Write-Host ("Getting access token for tenant: " + $currentAzureContext.Tenant.TenantId)
+    $token = $profileClient.AcquireAccessToken($currentAzureContext.Tenant.TenantId)
+    $token.AccessToken
+}
 
 # for each subscription get the quota data
 foreach ($SubscriptionId in $Subscriptions)
@@ -142,7 +161,7 @@ Function Post-OMSData($omsWorkspaceId, $omsSharedKey, $body, $logType)
 }
  
 # Submit the data to the API endpoint
-Post-OMSData -omsWorkspaceId $omsWorkspaceId -omsSharedKey $omsSharedKey -body ([System.Text.Encoding]::UTF8.GetBytes($json)) -logType $logType
+Post-OMSData -omsWorkspaceId $omsWorkspaceId.value -omsSharedKey $omsSharedKey.value -body ([System.Text.Encoding]::UTF8.GetBytes($json)) -logType $logType
 
 
 # The 'IsPastDue' property is 'true' when the current function invocation is later than scheduled.
