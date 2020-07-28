@@ -1,23 +1,22 @@
 # Input bindings are passed in via param block.
-param($Timer)
+param([string] $queueread, $TriggerMetadata) 
 
 # Get the current universal time in the default string format.
 $currentUTCtime = (Get-Date).ToUniversalTime()
 
 <#
 .SYNOPSIS
-Update Azure PowerShell modules in an Azure Automation account.
+Reads messages containing subscription ID's from a storage account queue when they are written. 
 
 .DESCRIPTION
-Azure Resource Quotas into a Log Analytics Workspace (Using PowerShell)
+Reads messages containing subscription ID's from a storage account queue when they are written. Subsequently checks subscription limits
+for given regions, formats into a JSON payload and writes to a Log Analytics workspace.
 Credit to Original Solution: https://blogs.msdn.microsoft.com/tomholl/2017/06/11/get-alerts-as-you-approach-your-azure-resource-quotas/
 #>
 
 $omsWorkspaceId = ls env:APPSETTING_omsWorkspaceId
 $omsSharedKey = ls env:APPSETTING_omsSharedKey
-$Subscriptions = "xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxx"
 $locations = "eastus2", "centralus"
-
 
 try
 { 
@@ -32,30 +31,13 @@ catch {
 $LogType = "AzureQuota"
  
 $json = ''
- 
-# Credit: s_lapointe  https://gallery.technet.microsoft.com/scriptcenter/Easily-obtain-AccessToken-3ba6e593
-function Get-AzCachedAccessToken()
-{
-    $ErrorActionPreference = 'Stop'
-  
-    if(-not (Get-Module Az.Accounts)) {
-        Import-Module Az.Accounts
-    }
-    $azProfile = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile
-    if(-not $azProfile.Accounts.Count) {
-        Write-Error "Ensure you have logged in before calling this function."    
-    }
-  
-    $currentAzureContext = Get-AzContext
-    $profileClient = New-Object Microsoft.Azure.Commands.ResourceManager.Common.RMProfileClient($azProfile)
-    Write-Host ("Getting access token for tenant: " + $currentAzureContext.Tenant.TenantId)
-    $token = $profileClient.AcquireAccessToken($currentAzureContext.Tenant.TenantId)
-    $token.AccessToken
-}
 
-# for each subscription get the quota data
-foreach ($SubscriptionId in $Subscriptions)
-{
+
+$SubscriptionId = $queueread
+# Write out the queue message and insertion time to the information log.
+Write-Host ("PowerShell queue trigger function processed work item: $SubscriptionId")
+Write-Host ("Queue item insertion time: $($TriggerMetadata.InsertionTime)")
+
 Write-Host ("Getting quotas for: " + $SubscriptionId)
 Set-AzContext -SubscriptionId $SubscriptionId
 $azureContext = Get-AzContext
@@ -104,7 +86,7 @@ foreach ($location in $locations)
 "@
  
 }
-}
+
 
 # Wrap in an array
 

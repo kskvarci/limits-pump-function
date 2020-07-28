@@ -1,10 +1,11 @@
 {
   "bindings": [
     {
-      "name": "Timer",
-      "type": "timerTrigger",
+      "type": "queueTrigger",
       "direction": "in",
-      "schedule": "0 0 0 * * *"
-    }
+      "name": "queueread",
+      "queueName": "limitspump",
+      "connection":"AzureWebJobsStorage"
+  }
   ]
 }
