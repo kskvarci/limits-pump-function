@@ -14,13 +14,16 @@ for given regions, formats into a JSON payload and writes to a Log Analytics wor
 Credit to Original Solution: https://blogs.msdn.microsoft.com/tomholl/2017/06/11/get-alerts-as-you-approach-your-azure-resource-quotas/
 #>
 
+# Pull log analytics info from App config.
+# TODO, externalize regions.
 $omsWorkspaceId = ls env:APPSETTING_omsWorkspaceId
 $omsSharedKey = ls env:APPSETTING_omsSharedKey
 $locations = "eastus2", "centralus"
 
+# Log into Azure with function app MSI
 try
 { 
-    "Logging in to Azure..."
+    Write-Host "Logging in to Azure..."
     Add-AzAccount -identity
 }
 catch {
@@ -29,15 +32,16 @@ catch {
 }
 
 $LogType = "AzureQuota"
- 
 $json = ''
 
-
+# load the subscription ID from the message
 $SubscriptionId = $queueread
+
 # Write out the queue message and insertion time to the information log.
 Write-Host ("PowerShell queue trigger function processed work item: $SubscriptionId")
 Write-Host ("Queue item insertion time: $($TriggerMetadata.InsertionTime)")
 
+# Select the subscription
 Write-Host ("Getting quotas for: " + $SubscriptionId)
 Set-AzContext -SubscriptionId $SubscriptionId
 $azureContext = Get-AzContext
@@ -89,10 +93,10 @@ foreach ($location in $locations)
 
 
 # Wrap in an array
-
 $json = "[$json]"
-Write-Host("json: " + $json)
-# Create the function to create the authorization signature
+# Write-Host("json: " + $json)
+
+# Create the authorization signature for the log analytics call
 Function Build-Signature ($omsWorkspaceId, $omsSharedKey, $date, $contentLength, $method, $contentType, $resource)
 {
     Write-Host ("Building signature.")
@@ -146,10 +150,5 @@ Function Post-OMSData($omsWorkspaceId, $omsSharedKey, $body, $logType)
 Post-OMSData -omsWorkspaceId $omsWorkspaceId.value -omsSharedKey $omsSharedKey.value -body ([System.Text.Encoding]::UTF8.GetBytes($json)) -logType $logType
 
 
-# The 'IsPastDue' property is 'true' when the current function invocation is later than scheduled.
-if ($Timer.IsPastDue) {
-    Write-Host "PowerShell timer is running late!"
-}
-
 # Write an information log with the current time.
-Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
+Write-Host "Storage Queue trigger function ran! TIME: $currentUTCtime"
